@@ -1,0 +1,8 @@
+{
+  "short_name": "Course Eval Summarizer",
+  "name": "Course Evaluation Summarizer",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#667eea",
+  "background_color": "#ffffff"
+}
