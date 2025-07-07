@@ -1,11 +1,8 @@
-import { Buffer } from 'buffer';
 import formidable from 'formidable';
-import { PDFExtract } from 'pdf-extract';
-import OpenAI from 'openai';
+import pdf from 'pdf-parse';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI (we'll use fetch instead of the library for better Vercel compatibility)
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 export const config = {
   api: {
@@ -28,19 +25,10 @@ const parseForm = (req) => {
 };
 
 const extractPDFText = async (filePath) => {
-  return new Promise((resolve, reject) => {
-    const extract = new PDFExtract();
-    extract.extract(filePath, {}, (err, data) => {
-      if (err) {
-        reject(err);
-      } else {
-        const text = data.pages
-          .map(page => page.content.map(item => item.str).join(' '))
-          .join('\n');
-        resolve(text);
-      }
-    });
-  });
+  const fs = require('fs');
+  const dataBuffer = fs.readFileSync(filePath);
+  const data = await pdf(dataBuffer);
+  return data.text;
 };
 
 const processComments = async (text) => {
@@ -81,17 +69,29 @@ Return the response in this exact format:
 Please be thorough but concise, focusing on actionable insights that will help the instructor improve while maintaining their confidence.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text }
-      ],
-      temperature: 0.3,
-      max_tokens: 1500,
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+      }),
     });
 
-    return response.choices[0].message.content;
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI API error:', error);
     throw new Error('Failed to process comments with AI');
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
 
   try {
     // Check if OpenAI API key is set
-    if (!process.env.OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY) {
       return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
