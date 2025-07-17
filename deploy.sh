@@ -24,21 +24,9 @@ if ! command -v vercel &> /dev/null; then
     npm install -g vercel
 fi
 
-# Check if .env.local exists
-if [ ! -f ".env.local" ]; then
-    echo "⚠️  Warning: .env.local not found."
-    echo "Please create .env.local with your Anthropic API key:"
-    echo "ANTHROPIC_API_KEY=your_anthropic_api_key_here"
-    echo ""
-    read -p "Do you want to create .env.local now? (y/N): " create_env
-    if [[ $create_env =~ ^[Yy]$ ]]; then
-        read -p "Enter your Anthropic API key: " api_key
-        echo "ANTHROPIC_API_KEY=$api_key" > .env.local
-        echo "✅ .env.local created successfully!"
-    else
-        echo "⚠️  Remember to set ANTHROPIC_API_KEY in Vercel environment variables."
-    fi
-fi
+echo "ℹ️  Note: This app now uses user-provided API keys!"
+echo "   No environment variables needed for deployment."
+echo ""
 
 # Install dependencies
 echo "📦 Installing dependencies..."
@@ -55,10 +43,16 @@ vercel --prod
 echo ""
 echo "✅ Deployment complete!"
 echo ""
-echo "📋 Next steps:"
-echo "1. Go to your Vercel dashboard"
-echo "2. Navigate to Settings > Environment Variables"
-echo "3. Add ANTHROPIC_API_KEY with your API key"
-echo "4. Redeploy if needed"
-echo ""
 echo "🎉 Your Course Evaluation Summarizer is ready!"
+echo ""
+echo "📋 How it works:"
+echo "1. Users visit your deployed app"
+echo "2. They enter their own Anthropic API key"
+echo "3. They upload course evaluation PDFs"
+echo "4. The app processes evaluations using their key"
+echo ""
+echo "🔐 Security benefits:"
+echo "• No shared API keys"
+echo "• Users control their own costs"
+echo "• No server-side key management"
+echo "• Enhanced privacy and security"
