@@ -4,8 +4,9 @@ A modern web application that helps instructors analyze course evaluations by fi
 
 ## Features
 
+- **User-Provided API Keys**: Secure, user-controlled API key system - no shared keys needed
 - **PDF Upload**: Upload course evaluation PDFs directly with drag-and-drop support
-- **AI-Powered Analysis**: Uses Anthropic Claude to process and categorize feedback
+- **AI-Powered Analysis**: Uses Anthropic Claude 4 Sonnet to process and categorize feedback
 - **Constructive Filtering**: Removes mean or unhelpful comments while preserving actionable feedback
 - **Frequency Analysis**: Shows how often specific suggestions appear
 - **Positive Highlights**: Extracts uplifting comments verbatim
@@ -16,7 +17,7 @@ A modern web application that helps instructors analyze course evaluations by fi
 ## Technology Stack
 
 - **Frontend**: React 18, Modern CSS3, Responsive Design
-- **Backend**: Node.js, Vercel Serverless Functions
+- **Backend**: Node.js, Vercel Serverless Functions (ES Modules)
 - **AI**: Anthropic Claude 4 Sonnet
 - **PDF Processing**: pdf-parse library
 - **File Upload**: formidable for multipart handling
@@ -26,8 +27,8 @@ A modern web application that helps instructors analyze course evaluations by fi
 
 ### Prerequisites
 - Node.js 18+ installed
-- Anthropic API key (get one at https://console.anthropic.com/)
 - Vercel account
+- Users will need their own Anthropic API key (get one at https://console.anthropic.com/)
 
 ### Setup Instructions
 
@@ -38,11 +39,8 @@ A modern web application that helps instructors analyze course evaluations by fi
    npm install
    ```
 
-2. **Environment Variables**
-   Create a `.env.local` file in the root directory:
-   ```
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   ```
+2. **No Environment Variables Needed**
+   This application now uses user-provided API keys, so no server-side environment variables are required for the API key.
 
 3. **Deploy to Vercel**
    ```bash
@@ -50,11 +48,8 @@ A modern web application that helps instructors analyze course evaluations by fi
    vercel
    ```
 
-4. **Configure Environment Variables in Vercel**
-   - Go to your Vercel dashboard
-   - Select your project
-   - Go to Settings > Environment Variables
-   - Add `ANTHROPIC_API_KEY` with your Anthropic API key
+4. **No Additional Configuration Required**
+   The app is ready to use once deployed - users enter their own API keys in the interface.
 
 ### Local Development
 
@@ -66,32 +61,41 @@ The app will run at `http://localhost:3000`
 
 ## How It Works
 
-1. **Upload**: Users upload a PDF containing course evaluations via drag-and-drop or file selector
-2. **Extract**: The app extracts text content from the PDF using pdf-parse
-3. **Process**: Anthropic Claude 4 analyzes the text to:
+1. **API Key Setup**: Users enter their own Anthropic API key, which is validated securely
+2. **Upload**: Users upload a PDF containing course evaluations via drag-and-drop or file selector
+3. **Extract**: The app extracts text content from the PDF using pdf-parse
+4. **Process**: Anthropic Claude 4 analyzes the text using the user's API key to:
    - Filter out mean/unhelpful comments
    - Categorize constructive feedback by theme with frequency counts
    - Extract positive comments verbatim
    - Provide overall sentiment analysis
-4. **Display**: Results are shown in a clean, readable format with proper typography
-5. **Download**: Users can download the complete summary as a text file
+5. **Display**: Results are shown in a clean, readable format with proper typography
+6. **Download**: Users can download the complete summary as a text file
+
+## Security & Privacy
+
+- **No Shared API Keys**: Each user provides their own Anthropic API key
+- **No Key Storage**: API keys are never stored on the server
+- **User Cost Control**: Users control their own API usage and costs
+- **File Processing**: Files are processed and immediately deleted from the server
+- **Enhanced Privacy**: No data persistence or tracking
 
 ## File Structure
 
 ```
 course-evaluation-summarizer/
 ├── api/
-│   └── upload.js          # Vercel serverless function for PDF processing
+│   ├── upload.js          # Main PDF processing endpoint (ES modules)
+│   └── test-key.js        # API key validation endpoint (ES modules)
 ├── public/
 │   ├── index.html         # HTML template
 │   └── manifest.json      # PWA manifest
 ├── src/
-│   ├── App.js             # Main React component
+│   ├── App.js             # Main React component with API key management
 │   ├── App.css            # Styling and responsive design
 │   └── index.js           # React entry point
-├── package.json           # Dependencies and scripts
+├── package.json           # Dependencies and scripts (ES modules enabled)
 ├── vercel.json            # Vercel configuration
-├── .env.local.example     # Environment variables template
 └── README.md              # This file
 ```
 
@@ -106,6 +110,12 @@ The application uses Anthropic's Claude 4 Sonnet model with the following config
 
 ## Features in Detail
 
+### User-Provided API Keys
+- **Secure Validation**: API keys are tested before use
+- **No Server Storage**: Keys are only used for the current session
+- **Cost Transparency**: Users see exactly what they're paying for
+- **Easy Setup**: Simple interface for entering and validating keys
+
 ### AI Analysis
 - **Constructive Filtering**: Removes purely negative comments without constructive value
 - **Theme Categorization**: Groups similar feedback with frequency indicators
@@ -113,25 +123,21 @@ The application uses Anthropic's Claude 4 Sonnet model with the following config
 - **Sentiment Analysis**: Provides overall evaluation tone assessment
 
 ### User Experience
+- **Two-Step Process**: API key setup, then file upload
 - **Progress Tracking**: Visual progress bar during processing
 - **Error Handling**: Clear error messages for common issues
 - **File Validation**: Ensures only PDF files are processed
 - **Responsive Design**: Optimized for all device sizes
 - **Accessibility**: Semantic HTML and proper contrast ratios
 
-### Security & Privacy
-- **No Data Persistence**: Files are processed and immediately deleted
-- **API Key Protection**: Environment variables keep credentials secure
-- **File Size Limits**: 10MB maximum file size
-- **Text Truncation**: Limits processing to prevent token overflow
-
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"Anthropic API key not configured"**
-   - Ensure `ANTHROPIC_API_KEY` is set in your environment variables
-   - Check that the key is valid and has sufficient credits
+1. **"Valid Anthropic API key required"**
+   - Ensure your API key starts with `sk-ant-` and is valid
+   - Get a new key from https://console.anthropic.com/
+   - Check that the key has sufficient credits
 
 2. **"Failed to extract text from PDF"**
    - Ensure the PDF contains readable text (not just images)
@@ -142,8 +148,8 @@ The application uses Anthropic's Claude 4 Sonnet model with the following config
    - Try with a smaller file or fewer pages
 
 4. **Build errors on Vercel**
-   - Ensure all dependencies are properly installed
-   - Check that `api/upload.js` is in the correct directory
+   - Ensure `"type": "module"` is in package.json
+   - Check that all API files use ES module syntax (`import`/`export`)
 
 ### Development Tips
 
@@ -169,7 +175,7 @@ This project is licensed under the GNU General Public License v3.0 - see the LIC
 For issues or questions:
 - Check the troubleshooting section above
 - Review Vercel function logs for deployment issues
-- Ensure your Anthropic API key has sufficient credits
+- Ensure your Anthropic API key is valid and has sufficient credits
 - Contact the maintainer through the GitHub repository
 
 ## Acknowledgments
@@ -178,3 +184,4 @@ For issues or questions:
 - Deployed on [Vercel](https://vercel.com/) for seamless hosting
 - Uses [pdf-parse](https://www.npmjs.com/package/pdf-parse) for PDF text extraction
 - Designed with educators in mind for better course improvement insights
+- Enhanced security through user-provided API keys
