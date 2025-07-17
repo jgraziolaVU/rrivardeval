@@ -3,11 +3,58 @@ import axios from 'axios';
 import './App.css';
 
 function App() {
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyValid, setApiKeyValid] = useState(false);
   const [file, setFile] = useState(null);
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
+  const [step, setStep] = useState('api-key'); // 'api-key' or 'upload'
+
+  const validateApiKey = (key) => {
+    // Basic validation for Anthropic API key format
+    return key && key.startsWith('sk-ant-') && key.length > 20;
+  };
+
+  const handleApiKeyChange = (e) => {
+    const key = e.target.value.trim();
+    setApiKey(key);
+    setApiKeyValid(validateApiKey(key));
+    setError("");
+  };
+
+  const handleApiKeySubmit = async () => {
+    if (!validateApiKey(apiKey)) {
+      setError("Please enter a valid Anthropic API key (starts with 'sk-ant-')");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    
+    try {
+      // Test the API key with a simple request
+      const response = await axios.post('/api/test-key', {
+        apiKey: apiKey
+      });
+      
+      if (response.data.valid) {
+        setApiKeyValid(true);
+        setStep('upload');
+      } else {
+        setError("Invalid API key. Please check your key and try again.");
+      }
+    } catch (err) {
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else {
+        setError("Unable to validate API key. Please check your key and try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -68,6 +115,7 @@ function App() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('apiKey', apiKey);
       
       const res = await axios.post('/api/upload', formData, {
         headers: {
@@ -121,6 +169,127 @@ function App() {
     if (fileInput) fileInput.value = '';
   };
 
+  const handleNewApiKey = () => {
+    setStep('api-key');
+    setApiKey('');
+    setApiKeyValid(false);
+    setFile(null);
+    setResponse('');
+    setError('');
+    setProgress(0);
+  };
+
+  if (step === 'api-key') {
+    return (
+      <div className="app">
+        <div className="container">
+          <header className="header">
+            <div className="header-content">
+              <h1 className="title">Course Evaluation Summarizer</h1>
+              <p className="subtitle">
+                Transform your course evaluations into constructive insights with AI
+              </p>
+              <div className="powered-by">
+                <span>Powered by</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="anthropic-logo">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" fill="currentColor"/>
+                  <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none"/>
+                </svg>
+                <span>Anthropic Claude 4</span>
+              </div>
+            </div>
+          </header>
+
+          <main className="main">
+            <div className="api-key-section">
+              <div className="api-key-card">
+                <div className="api-key-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <circle cx="12" cy="16" r="1"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                  </svg>
+                </div>
+                
+                <h2 className="api-key-title">Enter Your Anthropic API Key</h2>
+                <p className="api-key-description">
+                  You'll need your own Anthropic API key to use this service. Your key is processed securely and never stored.
+                </p>
+                
+                <div className="api-key-input-container">
+                  <input
+                    type="password"
+                    placeholder="sk-ant-..."
+                    value={apiKey}
+                    onChange={handleApiKeyChange}
+                    className={`api-key-input ${apiKeyValid ? 'valid' : ''}`}
+                  />
+                  {apiKeyValid && (
+                    <div className="api-key-valid-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="10"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                <div className="api-key-help">
+                  <p>Don't have an API key?</p>
+                  <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="api-key-link">
+                    Get one from Anthropic Console
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                      <path d="M15 3h6v6"/>
+                      <path d="M10 14L21 3"/>
+                    </svg>
+                  </a>
+                </div>
+
+                {error && (
+                  <div className="error-message">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="15" y1="9" x2="9" y2="15"/>
+                      <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleApiKeySubmit}
+                  disabled={!apiKeyValid || loading}
+                  className="btn btn-primary"
+                >
+                  {loading ? (
+                    <>
+                      <div className="spinner"></div>
+                      Validating...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 12l2 2 4-4"/>
+                        <circle cx="12" cy="12" r="10"/>
+                      </svg>
+                      Continue
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </main>
+
+          <footer className="footer">
+            <p>Built with care for educators everywhere • Powered by Anthropic Claude 4</p>
+          </footer>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <div className="container">
@@ -138,6 +307,18 @@ function App() {
                 <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none"/>
               </svg>
               <span>Anthropic Claude 4</span>
+            </div>
+            <div className="api-key-status">
+              <span className="api-key-indicator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4"/>
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+                API Key Connected
+              </span>
+              <button onClick={handleNewApiKey} className="btn-link">
+                Change Key
+              </button>
             </div>
           </div>
         </header>
