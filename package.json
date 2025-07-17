@@ -10,7 +10,10 @@
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4",
-    "axios": "^1.4.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
     "formidable": "^3.5.1",
     "pdf-parse": "^1.1.1"
   },
