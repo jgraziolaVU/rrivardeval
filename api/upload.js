@@ -34,19 +34,29 @@ const parseForm = (req) => {
         console.error('Form parsing error:', err);
         reject(err);
       } else {
+        // Handle case where files.file might be an array
+        let fileObj = files.file;
+        if (Array.isArray(fileObj)) {
+          fileObj = fileObj[0]; // Take the first file if it's an array
+        }
+        
         console.log('Raw form parse result:', {
           fields: Object.keys(fields),
           files: Object.keys(files),
-          fileDetails: files.file ? {
-            name: files.file.name,
-            originalFilename: files.file.originalFilename,
-            newFilename: files.file.newFilename,
-            mimetype: files.file.mimetype,
-            size: files.file.size,
-            filepath: files.file.filepath,
-            properties: Object.getOwnPropertyNames(files.file)
+          fileIsArray: Array.isArray(files.file),
+          fileDetails: fileObj ? {
+            name: fileObj.name,
+            originalFilename: fileObj.originalFilename,
+            newFilename: fileObj.newFilename,
+            mimetype: fileObj.mimetype,
+            size: fileObj.size,
+            filepath: fileObj.filepath,
+            properties: Object.getOwnPropertyNames(fileObj)
           } : 'No file'
         });
+        
+        // Update the files object with the corrected file
+        files.file = fileObj;
         resolve({ fields, files });
       }
     });
@@ -216,7 +226,13 @@ export default async function handler(req, res) {
   try {
     console.log('Request received, parsing form...');
     const { fields, files } = await parseForm(req);
-    uploadedFile = files.file; // Store for cleanup
+    
+    // Handle array case for file
+    let actualFile = files.file;
+    if (Array.isArray(files.file)) {
+      actualFile = files.file[0];
+    }
+    uploadedFile = actualFile; // Store for cleanup
     
     console.log('Form parsed successfully');
     console.log('Fields:', Object.keys(fields));
@@ -230,25 +246,34 @@ export default async function handler(req, res) {
     }
 
     const file = files.file;
+    
+    // Handle case where file might still be an array after parsing
+    let actualFile = file;
+    if (Array.isArray(file)) {
+      actualFile = file[0];
+      console.log('File was an array, taking first element');
+    }
+    
     console.log('File object details:', {
-      exists: !!file,
-      originalFilename: file?.originalFilename,
-      newFilename: file?.newFilename,
-      name: file?.name,
-      filename: file?.filename,
-      mimetype: file?.mimetype,
-      size: file?.size,
-      filepath: file?.filepath,
-      allProperties: file ? Object.getOwnPropertyNames(file) : 'No file'
+      exists: !!actualFile,
+      isArray: Array.isArray(file),
+      originalFilename: actualFile?.originalFilename,
+      newFilename: actualFile?.newFilename,
+      name: actualFile?.name,
+      filename: actualFile?.filename,
+      mimetype: actualFile?.mimetype,
+      size: actualFile?.size,
+      filepath: actualFile?.filepath,
+      allProperties: actualFile ? Object.getOwnPropertyNames(actualFile) : 'No file'
     });
 
-    if (!file) {
+    if (!actualFile) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
     // Check file type - try multiple property names
-    const filename = file.originalFilename || file.newFilename || file.name || file.filename || '';
-    const mimetype = file.mimetype || file.type || '';
+    const filename = actualFile.originalFilename || actualFile.newFilename || actualFile.name || actualFile.filename || '';
+    const mimetype = actualFile.mimetype || actualFile.type || '';
     
     console.log('File validation:', {
       filename: filename,
@@ -266,8 +291,8 @@ export default async function handler(req, res) {
         debug: {
           filename: filename,
           mimetype: mimetype,
-          receivedFile: !!file,
-          allProps: Object.getOwnPropertyNames(file)
+          receivedFile: !!actualFile,
+          allProps: Object.getOwnPropertyNames(actualFile)
         }
       });
     }
@@ -281,7 +306,7 @@ export default async function handler(req, res) {
     let text;
     try {
       console.log('Attempting to extract PDF text...');
-      text = await extractPDFText(file);
+      text = await extractPDFText(actualFile);
       console.log('PDF text extracted, length:', text.length);
     } catch (error) {
       console.error('PDF extraction error:', error);
