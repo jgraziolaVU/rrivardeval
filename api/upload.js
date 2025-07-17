@@ -165,7 +165,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Request received, parsing form...');
     const { fields, files } = await parseForm(req);
+    
+    console.log('Form parsed successfully');
+    console.log('Fields:', Object.keys(fields));
+    console.log('Files:', Object.keys(files));
     
     // Get API key from form data
     const apiKey = Array.isArray(fields.apiKey) ? fields.apiKey[0] : fields.apiKey;
@@ -175,20 +180,46 @@ export default async function handler(req, res) {
     }
 
     const file = files.file;
+    console.log('File object details:', {
+      exists: !!file,
+      originalFilename: file?.originalFilename,
+      filename: file?.filename,
+      mimetype: file?.mimetype,
+      size: file?.size
+    });
 
     if (!file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Check file type
-    if (!file.originalFilename?.toLowerCase().endsWith('.pdf')) {
-      return res.status(400).json({ error: 'Please upload a PDF file' });
+    // Check file type - more comprehensive check
+    const filename = file.originalFilename || file.filename || '';
+    const mimetype = file.mimetype || '';
+    
+    console.log('File validation:', {
+      filename: filename,
+      mimetype: mimetype,
+      endsWithPdf: filename.toLowerCase().endsWith('.pdf'),
+      isPdfMime: mimetype === 'application/pdf'
+    });
+    
+    if (!filename.toLowerCase().endsWith('.pdf') && mimetype !== 'application/pdf') {
+      return res.status(400).json({ 
+        error: 'Please upload a PDF file',
+        debug: {
+          filename: filename,
+          mimetype: mimetype,
+          receivedFile: !!file
+        }
+      });
     }
 
     // Extract text from PDF
     let text;
     try {
+      console.log('Attempting to extract PDF text...');
       text = await extractPDFText(file.filepath);
+      console.log('PDF text extracted, length:', text.length);
     } catch (error) {
       console.error('PDF extraction error:', error);
       return res.status(500).json({ error: 'Failed to extract text from PDF' });
@@ -203,14 +234,17 @@ export default async function handler(req, res) {
       text = text.substring(0, 50000) + "\n\n[Text truncated due to length]";
     }
 
+    console.log('Processing comments with AI...');
     // Process comments with AI using user's API key
     const result = await processComments(text, apiKey);
+    console.log('AI processing complete');
 
     res.status(200).json({ result });
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ 
-      error: error.message || 'Internal server error'
+      error: error.message || 'Internal server error',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   } finally {
     // Clean up uploaded file
