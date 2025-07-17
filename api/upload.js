@@ -3,11 +3,6 @@ import formidable from 'formidable';
 import pdf from 'pdf-parse';
 import fs from 'fs';
 
-// Initialize Anthropic
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 export const config = {
   api: {
     bodyParser: false,
@@ -39,7 +34,7 @@ const extractPDFText = async (filePath) => {
   }
 };
 
-const processComments = async (text) => {
+const processComments = async (text, apiKey) => {
   const prompt = `You are a kind and constructive assistant helping instructors analyze course evaluations. Your task is to:
 
 1. Filter out any comments that are mean, hurtful, or purely negative without constructive value
@@ -77,6 +72,11 @@ Here are the course evaluation comments to analyze:
 ${text}`;
 
   try {
+    // Initialize Anthropic with user's API key
+    const anthropic = new Anthropic({
+      apiKey: apiKey,
+    });
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
@@ -103,7 +103,49 @@ ${text}`;
       throw new Error('The AI declined to process this content for safety reasons. Please try with different content.');
     }
     
+    // Handle API key related errors
+    if (error.status === 401 || error.message.includes('authentication')) {
+      throw new Error('Invalid API key. Please check your Anthropic API key.');
+    }
+    
+    if (error.status === 429) {
+      throw new Error('Rate limit exceeded. Please try again in a moment.');
+    }
+    
+    if (error.status === 400) {
+      throw new Error('Invalid request. Please check your input and try again.');
+    }
+    
     throw new Error('Failed to process comments with AI');
+  }
+};
+
+const validateApiKey = (apiKey) => {
+  return apiKey && apiKey.startsWith('sk-ant-') && apiKey.length > 20;
+};
+
+const testApiKey = async (apiKey) => {
+  try {
+    const anthropic = new Anthropic({
+      apiKey: apiKey,
+    });
+
+    // Test with a simple request
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 10,
+      messages: [
+        {
+          role: 'user',
+          content: 'Hello'
+        }
+      ]
+    });
+
+    return response.content[0].text !== undefined;
+  } catch (error) {
+    console.error('API key test error:', error);
+    return false;
   }
 };
 
@@ -123,12 +165,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if Anthropic API key is set
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'Anthropic API key not configured' });
+    const { fields, files } = await parseForm(req);
+    
+    // Get API key from form data
+    const apiKey = Array.isArray(fields.apiKey) ? fields.apiKey[0] : fields.apiKey;
+    
+    if (!apiKey || !validateApiKey(apiKey)) {
+      return res.status(400).json({ error: 'Valid Anthropic API key required' });
     }
 
-    const { fields, files } = await parseForm(req);
     const file = files.file;
 
     if (!file) {
@@ -158,15 +203,14 @@ export default async function handler(req, res) {
       text = text.substring(0, 50000) + "\n\n[Text truncated due to length]";
     }
 
-    // Process comments with AI
-    const result = await processComments(text);
+    // Process comments with AI using user's API key
+    const result = await processComments(text, apiKey);
 
     res.status(200).json({ result });
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ 
-      error: 'Internal server error', 
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      error: error.message || 'Internal server error'
     });
   } finally {
     // Clean up uploaded file
