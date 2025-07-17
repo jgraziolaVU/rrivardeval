@@ -87,6 +87,8 @@ function App() {
         setError(err.response.data.error);
       } else if (err.code === 'ECONNABORTED') {
         setError("Request timed out. Please try again with a smaller file.");
+      } else if (err.response?.data?.error?.includes('safety reasons')) {
+        setError("The AI declined to process this content for safety reasons. Please try with different content.");
       } else {
         setError("An error occurred while processing your file. Please try again.");
       }
@@ -135,7 +137,7 @@ function App() {
                 <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none"/>
                 <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" fill="none"/>
               </svg>
-              <span>Anthropic Claude</span>
+              <span>Anthropic Claude 4</span>
             </div>
           </div>
         </header>
@@ -281,7 +283,7 @@ function App() {
         </main>
 
         <footer className="footer">
-          <p>Built with care for educators everywhere • Powered by Anthropic Claude</p>
+          <p>Built with care for educators everywhere • Powered by Anthropic Claude 4</p>
         </footer>
       </div>
     </div>
