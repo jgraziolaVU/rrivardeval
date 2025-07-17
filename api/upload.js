@@ -14,23 +14,46 @@ const parseForm = (req) => {
     const form = formidable({
       maxFileSize: 10 * 1024 * 1024, // 10MB
       keepExtensions: true,
+      multiples: false,
     });
 
     form.parse(req, (err, fields, files) => {
-      if (err) reject(err);
-      else resolve({ fields, files });
+      if (err) {
+        console.error('Form parsing error:', err);
+        reject(err);
+      } else {
+        console.log('Raw form parse result:', {
+          fields: Object.keys(fields),
+          files: Object.keys(files),
+          fileDetails: files.file ? {
+            name: files.file.name,
+            originalFilename: files.file.originalFilename,
+            newFilename: files.file.newFilename,
+            mimetype: files.file.mimetype,
+            size: files.file.size,
+            filepath: files.file.filepath,
+            properties: Object.getOwnPropertyNames(files.file)
+          } : 'No file'
+        });
+        resolve({ fields, files });
+      }
     });
   });
 };
 
 const extractPDFText = async (filePath) => {
   try {
+    console.log('Reading PDF file from path:', filePath);
     const dataBuffer = fs.readFileSync(filePath);
+    console.log('PDF file read successfully, size:', dataBuffer.length);
+    
     const data = await pdf(dataBuffer);
+    console.log('PDF parsing complete. Text length:', data.text.length);
+    
     return data.text;
   } catch (error) {
     console.error('PDF extraction error:', error);
-    throw new Error('Failed to extract text from PDF');
+    throw new Error(`Failed to extract text from PDF: ${error.message}`);
   }
 };
 
@@ -183,18 +206,22 @@ export default async function handler(req, res) {
     console.log('File object details:', {
       exists: !!file,
       originalFilename: file?.originalFilename,
+      newFilename: file?.newFilename,
+      name: file?.name,
       filename: file?.filename,
       mimetype: file?.mimetype,
-      size: file?.size
+      size: file?.size,
+      filepath: file?.filepath,
+      allProperties: file ? Object.getOwnPropertyNames(file) : 'No file'
     });
 
     if (!file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    // Check file type - more comprehensive check
-    const filename = file.originalFilename || file.filename || '';
-    const mimetype = file.mimetype || '';
+    // Check file type - try multiple property names
+    const filename = file.originalFilename || file.newFilename || file.name || file.filename || '';
+    const mimetype = file.mimetype || file.type || '';
     
     console.log('File validation:', {
       filename: filename,
@@ -203,15 +230,24 @@ export default async function handler(req, res) {
       isPdfMime: mimetype === 'application/pdf'
     });
     
-    if (!filename.toLowerCase().endsWith('.pdf') && mimetype !== 'application/pdf') {
+    // More lenient validation - accept if either filename ends with .pdf OR mimetype is correct
+    const isValidPdf = filename.toLowerCase().endsWith('.pdf') || mimetype === 'application/pdf';
+    
+    if (!isValidPdf && filename !== '' && mimetype !== '') {
       return res.status(400).json({ 
         error: 'Please upload a PDF file',
         debug: {
           filename: filename,
           mimetype: mimetype,
-          receivedFile: !!file
+          receivedFile: !!file,
+          allProps: Object.getOwnPropertyNames(file)
         }
       });
+    }
+
+    // If we have a file but no filename/mimetype, try to proceed anyway
+    if (!filename && !mimetype) {
+      console.log('Warning: No filename or mimetype detected, but file exists. Proceeding...');
     }
 
     // Extract text from PDF
