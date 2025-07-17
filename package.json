@@ -13,7 +13,7 @@
     "axios": "^1.6.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.24.3",
+    "@anthropic-ai/sdk": "^0.30.0",
     "formidable": "^3.5.1",
     "pdf-parse": "^1.1.1"
   },
