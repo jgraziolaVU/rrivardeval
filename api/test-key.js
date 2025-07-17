@@ -1,6 +1,6 @@
-const Anthropic = require('@anthropic-ai/sdk');
+import Anthropic from '@anthropic-ai/sdk';
 
-const config = {
+export const config = {
   api: {
     bodyParser: true,
   },
@@ -80,5 +80,4 @@ async function handler(req, res) {
   }
 }
 
-module.exports = handler;
-module.exports.config = config;
+export default handler;
