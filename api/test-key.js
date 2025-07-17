@@ -1,6 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+const Anthropic = require('@anthropic-ai/sdk');
 
-export const config = {
+const config = {
   api: {
     bodyParser: true,
   },
@@ -35,7 +35,7 @@ const testApiKey = async (apiKey) => {
   }
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -79,3 +79,6 @@ export default async function handler(req, res) {
     });
   }
 }
+
+module.exports = handler;
+module.exports.config = config;
