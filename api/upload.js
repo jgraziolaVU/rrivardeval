@@ -5,8 +5,6 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-export default handler;
-
 export const config = {
   api: {
     bodyParser: false,
@@ -269,3 +267,5 @@ async function handler(req, res) {
     }
   }
 }
+
+export default handler;
