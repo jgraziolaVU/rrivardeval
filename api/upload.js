@@ -39,7 +39,8 @@ const parseForm = (req) => {
 
         console.log('Form parsed successfully:', {
           fileSize: fileObj?.size,
-          fileName: fileObj?.originalFilename
+          fileName: fileObj?.originalFilename,
+          filepath: fileObj?.filepath
         });
 
         files.file = fileObj;
@@ -56,6 +57,7 @@ const processPDFWithClaude = async (file, apiKey) => {
     if (file.filepath && fs.existsSync(file.filepath)) {
       console.log('Reading PDF file from path:', file.filepath);
       dataBuffer = fs.readFileSync(file.filepath);
+      console.log('PDF read successfully, buffer size:', dataBuffer.length);
     } else if (file.buffer) {
       console.log('Using PDF file buffer');
       dataBuffer = file.buffer;
@@ -142,6 +144,11 @@ Please be thorough but concise, focusing on actionable insights that will help t
     return response.content[0].text;
   } catch (error) {
     console.error('Claude document processing error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.status,
+      type: error.type
+    });
 
     if (error.message.includes('refusal') || error.message.includes('Content declined')) {
       throw new Error('The AI declined to process this content for safety reasons.');
@@ -206,10 +213,16 @@ async function handler(req, res) {
     console.log('Processing file:', {
       filename,
       mimetype,
-      size: actualFile.size
+      size: actualFile.size,
+      filepath: actualFile.filepath
     });
 
-    // Use Claude's document API directly instead of pdf-parse
+    // Validate PDF file exists and is readable
+    if (!actualFile.filepath || !fs.existsSync(actualFile.filepath)) {
+      throw new Error('Unable to access uploaded file');
+    }
+
+    // Use Claude's document API directly for PDF processing
     console.log('Processing PDF with Claude document API...');
     const result = await processPDFWithClaude(actualFile, apiKey);
     console.log('Processing complete');
