@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import formidable from 'formidable';
 import pdf from 'pdf-parse';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 export const config = {
   api: {
@@ -11,10 +13,20 @@ export const config = {
 
 const parseForm = (req) => {
   return new Promise((resolve, reject) => {
+    // Create temp directory
+    const uploadDir = path.join(os.tmpdir(), 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
     const form = formidable({
       maxFileSize: 10 * 1024 * 1024, // 10MB
       keepExtensions: true,
       multiples: false,
+      uploadDir: uploadDir,
+      filename: (name, ext, part) => {
+        return `${Date.now()}-${Math.random().toString(36).substring(2)}${ext}`;
+      }
     });
 
     form.parse(req, (err, fields, files) => {
@@ -41,10 +53,22 @@ const parseForm = (req) => {
   });
 };
 
-const extractPDFText = async (filePath) => {
+const extractPDFText = async (file) => {
   try {
-    console.log('Reading PDF file from path:', filePath);
-    const dataBuffer = fs.readFileSync(filePath);
+    let dataBuffer;
+    
+    if (file.filepath && fs.existsSync(file.filepath)) {
+      // Use filepath if available
+      console.log('Reading PDF file from path:', file.filepath);
+      dataBuffer = fs.readFileSync(file.filepath);
+    } else if (file.buffer) {
+      // Use buffer if available
+      console.log('Using PDF file buffer, size:', file.buffer.length);
+      dataBuffer = file.buffer;
+    } else {
+      throw new Error('No valid file path or buffer found');
+    }
+    
     console.log('PDF file read successfully, size:', dataBuffer.length);
     
     const data = await pdf(dataBuffer);
@@ -187,9 +211,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let uploadedFile = null;
+
   try {
     console.log('Request received, parsing form...');
     const { fields, files } = await parseForm(req);
+    uploadedFile = files.file; // Store for cleanup
     
     console.log('Form parsed successfully');
     console.log('Fields:', Object.keys(fields));
@@ -254,11 +281,11 @@ export default async function handler(req, res) {
     let text;
     try {
       console.log('Attempting to extract PDF text...');
-      text = await extractPDFText(file.filepath);
+      text = await extractPDFText(file);
       console.log('PDF text extracted, length:', text.length);
     } catch (error) {
       console.error('PDF extraction error:', error);
-      return res.status(500).json({ error: 'Failed to extract text from PDF' });
+      return res.status(500).json({ error: 'Failed to extract text from PDF: ' + error.message });
     }
 
     if (!text || text.trim().length === 0) {
@@ -285,8 +312,9 @@ export default async function handler(req, res) {
   } finally {
     // Clean up uploaded file
     try {
-      if (req.file?.filepath) {
-        fs.unlinkSync(req.file.filepath);
+      if (uploadedFile?.filepath && fs.existsSync(uploadedFile.filepath)) {
+        fs.unlinkSync(uploadedFile.filepath);
+        console.log('Cleaned up temporary file:', uploadedFile.filepath);
       }
     } catch (cleanupError) {
       console.error('File cleanup error:', cleanupError);
