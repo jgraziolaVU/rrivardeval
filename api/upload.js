@@ -78,7 +78,7 @@ ${text}`;
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
       temperature: 0.3,
       messages: [
@@ -89,9 +89,20 @@ ${text}`;
       ]
     });
 
+    // Handle potential refusal stop reason in Claude 4
+    if (response.stop_reason === 'refusal') {
+      throw new Error('Content declined by AI for safety reasons');
+    }
+
     return response.content[0].text;
   } catch (error) {
     console.error('Anthropic API error:', error);
+    
+    // Handle specific Claude 4 refusal cases
+    if (error.message.includes('refusal') || error.message.includes('Content declined')) {
+      throw new Error('The AI declined to process this content for safety reasons. Please try with different content.');
+    }
+    
     throw new Error('Failed to process comments with AI');
   }
 };
