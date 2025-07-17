@@ -1,12 +1,12 @@
-const Anthropic = require('@anthropic-ai/sdk');
-const formidable = require('formidable');
-const pdf = require('pdf-parse');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import Anthropic from '@anthropic-ai/sdk';
+import formidable from 'formidable';
+import pdf from 'pdf-parse';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-module.exports = handler;
-module.exports.config = {
+export default handler;
+export const config = {
   api: {
     bodyParser: false,
   },
@@ -206,8 +206,6 @@ const testApiKey = async (apiKey) => {
     return false;
   }
 };
-
-module.exports = handler;
 
 async function handler(req, res) {
   // Add CORS headers
