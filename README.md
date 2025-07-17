@@ -17,7 +17,7 @@ A modern web application that helps instructors analyze course evaluations by fi
 
 - **Frontend**: React 18, Modern CSS3, Responsive Design
 - **Backend**: Node.js, Vercel Serverless Functions
-- **AI**: Anthropic Claude 3.5 Sonnet
+- **AI**: Anthropic Claude 4 Sonnet
 - **PDF Processing**: pdf-parse library
 - **File Upload**: formidable for multipart handling
 - **Hosting**: Vercel (free tier compatible)
@@ -68,7 +68,7 @@ The app will run at `http://localhost:3000`
 
 1. **Upload**: Users upload a PDF containing course evaluations via drag-and-drop or file selector
 2. **Extract**: The app extracts text content from the PDF using pdf-parse
-3. **Process**: Anthropic Claude analyzes the text to:
+3. **Process**: Anthropic Claude 4 analyzes the text to:
    - Filter out mean/unhelpful comments
    - Categorize constructive feedback by theme with frequency counts
    - Extract positive comments verbatim
@@ -97,11 +97,12 @@ course-evaluation-summarizer/
 
 ## API Configuration
 
-The application uses Anthropic's Claude 3.5 Sonnet model with the following configuration:
-- **Model**: `claude-3-5-sonnet-20241022`
+The application uses Anthropic's Claude 4 Sonnet model with the following configuration:
+- **Model**: `claude-sonnet-4-20250514`
 - **Max Tokens**: 2000
 - **Temperature**: 0.3 (for consistent, focused responses)
 - **Timeout**: 30 seconds for processing
+- **Enhanced Safety**: Includes Claude 4's new refusal handling for safety
 
 ## Features in Detail
 
@@ -173,7 +174,7 @@ For issues or questions:
 
 ## Acknowledgments
 
-- Built with [Anthropic Claude](https://www.anthropic.com/) for AI analysis
+- Built with [Anthropic Claude 4](https://www.anthropic.com/) for superior AI analysis
 - Deployed on [Vercel](https://vercel.com/) for seamless hosting
 - Uses [pdf-parse](https://www.npmjs.com/package/pdf-parse) for PDF text extraction
 - Designed with educators in mind for better course improvement insights
