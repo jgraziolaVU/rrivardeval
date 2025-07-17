@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import formidable from 'formidable';
-import pdf from 'pdf-parse';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -19,7 +18,7 @@ const parseForm = (req) => {
     }
 
     const form = formidable({
-      maxFileSize: 10 * 1024 * 1024, // 10MB
+      maxFileSize: 4 * 1024 * 1024, // 4MB for Vercel free tier
       keepExtensions: true,
       multiples: false,
       uploadDir: uploadDir,
@@ -38,19 +37,9 @@ const parseForm = (req) => {
           fileObj = fileObj[0];
         }
 
-        console.log('Raw form parse result:', {
-          fields: Object.keys(fields),
-          files: Object.keys(files),
-          fileIsArray: Array.isArray(files.file),
-          fileDetails: fileObj ? {
-            name: fileObj.name,
-            originalFilename: fileObj.originalFilename,
-            newFilename: fileObj.newFilename,
-            mimetype: fileObj.mimetype,
-            size: fileObj.size,
-            filepath: fileObj.filepath,
-            properties: Object.getOwnPropertyNames(fileObj)
-          } : 'No file'
+        console.log('Form parsed successfully:', {
+          fileSize: fileObj?.size,
+          fileName: fileObj?.originalFilename
         });
 
         files.file = fileObj;
@@ -60,7 +49,7 @@ const parseForm = (req) => {
   });
 };
 
-const extractPDFText = async (file) => {
+const processPDFWithClaude = async (file, apiKey) => {
   try {
     let dataBuffer;
 
@@ -68,25 +57,23 @@ const extractPDFText = async (file) => {
       console.log('Reading PDF file from path:', file.filepath);
       dataBuffer = fs.readFileSync(file.filepath);
     } else if (file.buffer) {
-      console.log('Using PDF file buffer, size:', file.buffer.length);
+      console.log('Using PDF file buffer');
       dataBuffer = file.buffer;
     } else {
       throw new Error('No valid file path or buffer found');
     }
 
-    console.log('PDF file read successfully, size:', dataBuffer.length);
-    const data = await pdf(dataBuffer);
-    console.log('PDF parsing complete. Text length:', data.text.length);
-    return data.text;
-  } catch (error) {
-    console.error('PDF extraction error:', error);
-    throw new Error(`Failed to extract text from PDF: ${error.message}`);
-  }
-};
+    // Convert to base64 for Claude's document API
+    const base64Data = dataBuffer.toString('base64');
+    console.log('PDF converted to base64, length:', base64Data.length);
 
-const processComments = async (text, apiKey) => {
-  const prompt = `You are a kind and constructive assistant helping instructors analyze course evaluations. Your task is to:
+    const prompt = `You are a kind and constructive assistant helping instructors analyze course evaluations. 
 
+First, extract all the student comments from this course evaluation PDF. Focus on the sections asking about:
+1. What aspects of this course and the instructor's teaching contributed most to your learning?
+2. What aspects of this course and the instructor's teaching could be changed to enhance your learning?
+
+Then, analyze the comments to:
 1. Filter out any comments that are mean, hurtful, or purely negative without constructive value
 2. Categorize constructive feedback into themes and count frequency
 3. Summarize actionable suggestions with frequency indicators
@@ -116,20 +103,37 @@ Return the response in this exact format:
 ## OVERALL SENTIMENT
 [Brief summary of the overall tone and any patterns you noticed]
 
-Please be thorough but concise, focusing on actionable insights that will help the instructor improve while maintaining their confidence.
+Please be thorough but concise, focusing on actionable insights that will help the instructor improve while maintaining their confidence.`;
 
-Here are the course evaluation comments to analyze:
-${text}`;
-
-  try {
     const anthropic = new Anthropic({ apiKey });
 
+    console.log('Sending PDF to Claude for analysis...');
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
       temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }]
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: base64Data,
+              },
+            },
+            {
+              type: 'text',
+              text: prompt,
+            },
+          ],
+        },
+      ],
     });
+
+    console.log('Claude analysis complete');
 
     if (response.stop_reason === 'refusal') {
       throw new Error('Content declined by AI for safety reasons');
@@ -137,10 +141,10 @@ ${text}`;
 
     return response.content[0].text;
   } catch (error) {
-    console.error('Anthropic API error:', error);
+    console.error('Claude document processing error:', error);
 
     if (error.message.includes('refusal') || error.message.includes('Content declined')) {
-      throw new Error('The AI declined to process this content for safety reasons. Please try with different content.');
+      throw new Error('The AI declined to process this content for safety reasons.');
     }
 
     if (error.status === 401 || error.message.includes('authentication')) {
@@ -152,10 +156,10 @@ ${text}`;
     }
 
     if (error.status === 400) {
-      throw new Error('Invalid request. Please check your input and try again.');
+      throw new Error('Invalid request. The PDF might be corrupted or in an unsupported format.');
     }
 
-    throw new Error('Failed to process comments with AI');
+    throw new Error(`Failed to process PDF with AI: ${error.message}`);
   }
 };
 
@@ -186,10 +190,6 @@ async function handler(req, res) {
     const actualFile = files.file;
     uploadedFile = actualFile;
 
-    console.log('Form parsed successfully');
-    console.log('Fields:', Object.keys(fields));
-    console.log('Files:', Object.keys(files));
-
     const apiKey = Array.isArray(fields.apiKey) ? fields.apiKey[0] : fields.apiKey;
 
     if (!apiKey || !validateApiKey(apiKey)) {
@@ -200,54 +200,19 @@ async function handler(req, res) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const filename = actualFile.originalFilename || actualFile.newFilename || actualFile.name || actualFile.filename || '';
+    const filename = actualFile.originalFilename || actualFile.newFilename || actualFile.name || '';
     const mimetype = actualFile.mimetype || actualFile.type || '';
 
-    console.log('File object details:', {
-      exists: !!actualFile,
-      originalFilename: actualFile?.originalFilename,
-      newFilename: actualFile?.newFilename,
-      name: actualFile?.name,
-      filename: actualFile?.filename,
-      mimetype: actualFile?.mimetype,
-      size: actualFile?.size,
-      filepath: actualFile?.filepath,
-      allProperties: Object.getOwnPropertyNames(actualFile)
+    console.log('Processing file:', {
+      filename,
+      mimetype,
+      size: actualFile.size
     });
 
-    const isValidPdf = filename.toLowerCase().endsWith('.pdf') || mimetype === 'application/pdf';
-
-    if (!isValidPdf && filename !== '' && mimetype !== '') {
-      return res.status(400).json({
-        error: 'Please upload a PDF file',
-        debug: {
-          filename,
-          mimetype,
-          receivedFile: !!actualFile,
-          allProps: Object.getOwnPropertyNames(actualFile)
-        }
-      });
-    }
-
-    if (!filename && !mimetype) {
-      console.log('Warning: No filename or mimetype detected, but file exists. Proceeding...');
-    }
-
-    console.log('Attempting to extract PDF text...');
-    const text = await extractPDFText(actualFile);
-    console.log('PDF text extracted, length:', text.length);
-
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: 'No text found in PDF' });
-    }
-
-    const trimmedText = text.length > 50000
-      ? text.substring(0, 50000) + "\n\n[Text truncated due to length]"
-      : text;
-
-    console.log('Processing comments with AI...');
-    const result = await processComments(trimmedText, apiKey);
-    console.log('AI processing complete');
+    // Use Claude's document API directly instead of pdf-parse
+    console.log('Processing PDF with Claude document API...');
+    const result = await processPDFWithClaude(actualFile, apiKey);
+    console.log('Processing complete');
 
     res.status(200).json({ result });
   } catch (error) {
@@ -260,7 +225,7 @@ async function handler(req, res) {
     try {
       if (uploadedFile?.filepath && fs.existsSync(uploadedFile.filepath)) {
         fs.unlinkSync(uploadedFile.filepath);
-        console.log('Cleaned up temporary file:', uploadedFile.filepath);
+        console.log('Cleaned up temporary file');
       }
     } catch (cleanupError) {
       console.error('File cleanup error:', cleanupError);
